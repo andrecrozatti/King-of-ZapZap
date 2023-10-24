@@ -4,6 +4,8 @@ var qrcode = require('qrcode-terminal');
 const Util = require('./whatsapp-web.js/src/util/Util');
 const express = require('express')
 const app = express()
+const fs = require("fs")
+const sharp = require("sharp")
 app.use(express.urlencoded({extended: true}))
 const port = 3000
 
@@ -17,9 +19,6 @@ const iniciaChat = async (id, figurinha) => {
         puppeteer: { headless: true }
     });
     client.initialize();
-
-
-
 
     client.on('qr', (qr) => {
         // NOTE: This event will not be fired if a session is specified.
@@ -60,6 +59,8 @@ const iniciaChat = async (id, figurinha) => {
         } else if (msg.body === '!ping') {
             // Send a new message to the same chat
             var a = msg
+            ajustarImagem(a._data.body)
+
             var media = new MessageMedia(a._data.mimetype, a._data.body)
             client.sendMessage(msg.from, media, {
                 sendMediaAsSticker:true
@@ -242,12 +243,43 @@ const iniciaChat = async (id, figurinha) => {
 
     async function enviaImagem(base64) {
         //var media = await MessageMedia.fromUrl('https://via.placeholder.com/350x150.png');
-        var mime = base64.substring(base64.indexOf(":")+1,base64.indexOf(";"))
-        var media = await enviaFigurinha(base64.substring(base64.indexOf(",") + 1), mime)
+        
+        
+
+        // var mime = base64.substring(base64.indexOf(":")+1,base64.indexOf(";"))
+        // var media = await enviaFigurinha(base64.substring(base64.indexOf(",") + 1), mime)
+        const base64data = ajustarImagem(base64)
+        var mime = 'image/webp'
+        var media = await enviaFigurinha(base64data, mime)
+
         await client.sendMessage('5519992942394@c.us', media, {
             sendMediaAsSticker: true
         });
 
+    }
+
+    async function ajustarImagem(base64) {
+        let buff
+        if (base64.indexOf(",")) {
+            buff = new Buffer.from(base64.substring(base64.indexOf(",") + 1), 'base64');
+        }else{
+            buff = new Buffer.from(base64, 'base64');
+        }   
+        
+        fs.writeFileSync('fig.webp', buff);
+        await sharp('fig.webp')
+        .clone()
+        .resize({width:512, height:512})
+        .toFile('./fig_convertida.webp')
+        .then((info)=>{
+            console.log(info)
+        })
+        .catch(err => {
+            console.log(err)
+        })
+
+        buff = fs.readFileSync('fig_convertida.webp');
+        return buff.toString('base64');
     }
 
 }
